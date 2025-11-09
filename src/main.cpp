@@ -260,9 +260,11 @@ int main() {
       const auto &logits_data = logits->get_data();
       size_t logits_offset = last_token_index * target_vocab_size;
 
-      // Find the token with the highest logit
+      // Temperature sampling for more diverse outputs
+      float temperature = 1.0f;
+      std::vector<float> probs(target_vocab_size);
       float max_logit = -std::numeric_limits<float>::infinity();
-      int predicted_id = -1;
+
       if (logits_offset + target_vocab_size > logits_data.size()) {
         std::cerr << "\nError: Logits offset (" << logits_offset
                   << ") + vocab_size (" << target_vocab_size
@@ -272,18 +274,35 @@ int main() {
         break;
       }
 
+      // Find max for numerical stability
       for (int j = 0; j < target_vocab_size; ++j) {
         if (logits_data[logits_offset + j] > max_logit) {
           max_logit = logits_data[logits_offset + j];
-          predicted_id = j;
         }
       }
 
-      if (predicted_id == -1) {
-        std::cerr << "\nError: No valid predicted_id found (argmax failed?). "
-                     "Breaking."
-                  << std::endl;
-        break;
+      // Compute softmax with temperature
+      float sum_exp = 0.0f;
+      for (int j = 0; j < target_vocab_size; ++j) {
+        probs[j] = std::exp((logits_data[logits_offset + j] - max_logit) /
+                            temperature);
+        sum_exp += probs[j];
+      }
+      for (int j = 0; j < target_vocab_size; ++j) {
+        probs[j] /= sum_exp;
+      }
+
+      // Sample from the distribution
+      std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+      float random_val = dist(global_rng);
+      float cumsum = 0.0f;
+      int predicted_id = 0;
+      for (int j = 0; j < target_vocab_size; ++j) {
+        cumsum += probs[j];
+        if (random_val <= cumsum) {
+          predicted_id = j;
+          break;
+        }
       }
 
       // Append the predicted ID to our sequence
