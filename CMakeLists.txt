@@ -38,8 +38,11 @@ add_executable(neural_network
     src/utils/ConfigParser.cpp
 )
 
-# Link filesystem library (C++17)
-target_link_libraries(neural_network PRIVATE stdc++fs)
+if (WIN32)
+else()
+  # Link filesystem library (C++17)
+  target_link_libraries(neural_network PRIVATE stdc++fs)
+endif()
 
 add_executable(test_tensor
     tests/test_tensor.cpp
